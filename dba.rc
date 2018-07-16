@@ -1,0 +1,23 @@
+#! /usr/bin/env bash 
+[ -z $BOOTER_DBA_RC ] || { echo Warn: has sourced $BOOTER_DBA_RC!;  return 1; } 
+BOOTER_DBA_RC=$(evar=${BASH_SOURCE[0]} ruby -e "puts File.realpath(ENV['evar'])")
+BOOTER_DBA_HOME=$(dirname $BOOTER_DBA_RC)
+[ -d "$BOOTER_DBA_HOME/bin" ] && PATH=$PATH:$BOOTER_DBA_HOME/bin
+
+function dba(){
+  tp=${1:-cd}
+  case "$tp" in
+    home|root)
+      echo $BOOTER_DBA_HOME
+      ;;
+    cd)
+      cd "$BOOTER_DBA_HOME"
+      ;;
+    rc)
+      vi "$BOOTER_DBA_RC"
+      ;;
+    *)
+      type $FUNCNAME 
+      ;;
+  esac
+}

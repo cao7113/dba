@@ -1,0 +1,93 @@
+#!/usr/bin/env ruby
+require 'byebug'
+require 'thor'
+$:.unshift File.join(__dir__, '../lib')
+require 'dba'
+
+class DbaCLI < Thor
+  default_command :ls
+  map "-l" => :list 
+
+  desc 'names', 'list db names'
+  def names
+    puts $dbs.keys
+  end
+
+  desc 'ls', 'list dbs'
+  def ls
+    puts $dbs.values.map(&:to_s)
+  end
+
+  desc 'info [DB]', 'list db info'
+  def info(db = nil)
+    puts get_conn_builder(db).info
+  end 
+  
+  desc 'url', 'get db url'
+  def url(db = nil)
+    puts get_conn_builder(db).url
+  end
+
+  desc 'cli', 'into db cli'
+  def cli(db = nil)
+    get_conn_builder(db).cli
+  end
+
+  desc 'link URL', 'link to a url directly'
+  def link(url = nil)
+    connb = Dba::ConnBuilder.new(url: url)
+    connb.cli
+  end
+
+  desc 'debug', 'debug db tool'
+  def debug
+    byebug
+    puts
+  end
+end
+
+require 'pathname'
+require 'yaml'
+
+def load_dbs!(fpath)
+  abort "" unless fpath.exist?
+  dbs = {}
+
+  hash = YAML.load_file(fpath)
+  hash.each do |g, items|
+    items.each do |name, opts|
+      conn_builder = Dba::ConnBuilder.new(opts)
+      conn_builder.connid = [g, name].join('_')
+      dbs[conn_builder.connid] = conn_builder
+    end
+  end
+  dbs
+end
+
+def get_conn_builder(db = nil)
+  db ||= ENV['db']
+  unless db
+    names = $dbs.keys
+    if pat = ENV['pattern']
+      names = names.select{|n| n =~ /#{pat}/ } 
+    end
+
+    require 'tty-prompt'
+    prompt = TTY::Prompt.new
+    db = prompt.select('Choose db?', names, enum: ')', per_page: 20)
+  end
+  abort "No db specified!" unless db
+  $dbs[db]
+rescue LoadError => e
+  # todo call in rails console, get error 
+  #kgem = Kernel.method(:gem)
+  #kgem.call 'tty-prompt'
+  #retry
+  warn e
+end
+
+dbsfile = ENV['DBSFILE'] || '~/.pconf/dbs.yml'
+fpath = Pathname(dbsfile).expand_path
+$dbs = load_dbs!(fpath)
+
+DbaCLI.start
