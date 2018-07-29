@@ -1,0 +1,101 @@
+#!/usr/bin/env ruby
+require_relative '../boot'
+
+class PgbackCLI < Thor
+  map ["-l", :list] => :ls
+
+  desc 'ls', 'list backup'
+  def ls(url)
+    conn = get_conn(url)
+    dir = db_home(conn)
+    system "ls -l #{dir}"
+  end
+
+  desc 'up', ''
+  option :autoclean, type: :boolean, default: true
+  def up(url)
+    conn = get_conn(url)
+    tstamp = Time.now.strftime("%Y%m%d%H%M%S")
+    dir = db_home(conn).join(tstamp)
+    `pga dump --no-use-datafile #{url} #{dir}`
+    if options[:autoclean]
+      invoke(:clean, [url], {})
+    end
+  end
+
+  desc 'clean', ''
+  option :size, default: 3
+  def clean(url)
+    conn = get_conn(url)
+    dir = db_home(conn)
+    clean_old_versions!(dir, options.symbolize_keys.slice(:size))
+    invoke(:ls, [url])
+  end
+
+  desc '', 'get home'
+  def home(url=nil)
+    if url
+      conn = get_conn(url)
+      puts db_home(conn)
+    else
+      puts backup_home 
+    end
+  end
+
+  desc '', ''
+  def latest_path(url)
+    conn = get_conn(url)
+    puts db_home(conn).join(latest_version(conn))
+  end
+
+  no_tasks do
+    def backup_home
+      return @_dir if @_dir
+      dir = ENV['DBS_BACKUP_HOME'] || '~/.dbsbackup'
+      @_dir = Pathname(dir).expand_path
+    end
+    
+    def db_home(conn)
+      backup_home.join(conn.unique_id)
+    end
+
+    def latest_version(conn)
+      db_versions(conn)[0]
+    end
+
+    def db_versions(conn)
+      vers = nil
+      Dir.chdir(db_home(conn)) do
+        vers = `ls -1dr *`.split("\n")
+      end
+      vers
+    rescue =>e
+      []
+    end
+
+    def clean_old_versions!(dir, opts = {})
+      size = (opts[:size] || 3).to_i
+      # monthly group
+      pat = "#{Time.now.strftime('%Y%m')}*"
+      Dir.chdir(dir) do
+        vers = `ls -1d #{pat}`.split("\n")
+        return unless vers.size > size
+        olds = vers.first(vers.size - size)
+        system "rm -fr #{olds.join(' ')}"
+      end
+    rescue => e
+    end
+
+    def get_conn(url)
+      url = get_dburl(url)
+      Dba::ConnectionBuilder.new(url: url)
+    end
+
+    def get_dburl(db)
+      return db if Dba::Util.is_url?(db)
+      `dbcli url #{db}`.chomp
+    end
+  end
+end
+
+PgbackCLI.start

@@ -2,25 +2,42 @@
 source ENV['GEM_SOURCE'] || "https://rubygems.org"
 git_source(:github) {|repo_name| "https://github.com/#{repo_name}" }
 
-gem "byebug"
-#gem 'pry'
-gem "rspec"
-gem "activesupport"
-
-gem "pg"
-gem "sequel"
-#gem "hanami-cli"
-#gem 'migrations', github: 'cao7113/migrations'
-#gem 'sequel-postgres-schemata', path: 'refs/sequel-postgres-schemata'
-
-def forked_gem(name, repo)
-  path = "lfork/#{repo}"
-  opts = if File.exists?(path)
-    { path: path }
+def gem_fork(name, opts = {})
+  repo = opts[:repo] || name
+  lpath = "local/#{repo}"
+  if File.exist?(lpath)
+    gem name, path: lpath
   else
-    { github: "cao7113/#{repo}", branch: 'zhulu' }
+    gem name
   end
-  gem name, opts 
 end
 
-#forked_gem "pg_tester", 'pgtester'
+## tools
+gem "byebug"
+#gem 'pry'
+#gem 'pry-doc'
+#gem 'pry-stack_explorer'
+#gem 'pry-remote'
+# irb-tools
+#gem 'hirb' # great for table view
+#gem 'awesome_print'
+#gem 'table_print' # tp User.all, :name, :email, "jobs.title"
+
+## cli
+gem 'thor'
+gem 'tty-prompt'
+#gem "hanami-cli"
+
+## base
+gem "activesupport"
+
+## db
+gem "pg"
+gem "sequel"
+
+#gem "activerecord-import", require: false
+#https://github.com/thuss/standalone-migrations
+#gem 'standalone_migrations'
+
+## test
+gem "rspec"

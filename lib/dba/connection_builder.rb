@@ -1,10 +1,13 @@
 require 'uri'
 require 'pg'
+require 'forwardable'
 require "active_support/core_ext/hash/keys"
-
 require_relative 'db_cli'
+require_relative 'script_runner'
+require_relative 'querying'
 
-class Dba::ConnBuilder
+class Dba::ConnectionBuilder
+  include Dba::Querying
 
   attr_accessor :url, :options, :connid
   attr_reader   :uri
@@ -32,8 +35,8 @@ class Dba::ConnBuilder
     if user.length > 0 || passwd.length > 0
       url += "#{user}:#{passwd}@"
     end
-    url += get_part_if(opts, :host, suffix: ':') 
-    url += get_part_if(opts, :port) 
+    url += get_part_if(opts, :host) 
+    url += get_part_if(opts, :port, prefix: ':') 
     url += get_part_if(opts, :dbname, prefix: '/')
     url += get_part_if(opts, :query, prefix: '?') 
     #url += get_part_if(opts, :fragment, prefix: '#') 
@@ -47,11 +50,15 @@ class Dba::ConnBuilder
 
   def build_options(uri)
     attrs = %i(scheme user password host port path query fragment)
-    attrs.each_with_object({}) do |i, memo|
+    opts = attrs.each_with_object({}) do |i, memo|
       if uri.respond_to?(i)
-        memo[i] = uri.send(i)
+        s = i
+        memo[s] = uri.send(i)
       end
     end
+    # /path1 => dbname1
+    opts[:dbname] = opts.delete(:path).sub(/^\//, '')
+    opts
   end
 
   def dbtype
@@ -60,6 +67,15 @@ class Dba::ConnBuilder
 
   def dbname
     options[:dbname]
+  end
+
+  def unique_id
+    [dbname, host, port || '5432'].join('.')
+  end
+  alias_method :uid, :unique_id
+
+  def dbdomain
+    [dbname, host].join('.')
   end
 
   def info
@@ -73,21 +89,29 @@ class Dba::ConnBuilder
     "#{connid} #{url}"
   end
 
-  def cli
+  def cli(runner: nil)
     case dbtype
     when /^postgres/
-      DbCli.pgcli url
+      Dba::DbCli.exec url, runner: runner
     end
+  end
+
+  def script_runner
+    @_script_runner ||= Dba::ScriptRunner.new(self)
   end
 
   ################################################
   #          connection
   
   def connection
-    @connection ||= case dbtype
-      when /^postgres/
-        PG::Connection.open(conn_hash)
-      end
+    @connection ||= retrieve_connection
+  end
+
+  def retrieve_connection
+    case dbtype
+    when /^postgres/
+      PG::Connection.open(conn_hash)
+    end
   end
 
   def close!
@@ -96,7 +120,29 @@ class Dba::ConnBuilder
     @connection = nil
   end
 
-  def sql(query, params = nil)
+  def try_connect!
+    c = retrieve_connection 
+  rescue PG::ConnectionBad => e
+    #PG::ConnectionBad: FATAL:  database "missing_db" does not exist
+    if e.message =~ /does not exist/
+      raise DbNotExistError.new(e.message)
+    else
+      raise ConnectError.new(e.message)
+    end
+  rescue => e
+    raise ConnectError.new(e.message)
+  ensure
+    c&.close
+  end
+
+  def db_not_exist?
+    try_connect!
+    false
+  rescue DbNotExistError => e
+    true
+  end
+
+  def run_sql(query, params = nil)
     result = if params
       connection.exec_params(query, params)
     else
@@ -108,15 +154,26 @@ class Dba::ConnBuilder
       close!
     end
 
-    ResultStatus.new(result)
+    ResultStatus.new(result, conn: self)
   rescue => e
     ResultStatus.new(e)
+  end
+  alias_method :exec, :run_sql
+
+  def fork(opts = {})
+    opts = options.merge(opts)
+    conn = self.class.new(opts)
+    if block_given?
+      yield conn
+      conn.close!
+    end
+    conn
   end
 
   # https://www.postgresql.org/docs/9.2/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS
   def conn_hash
     # no scheme required!!!
-    options.slice(*%i(user host port dbname))
+    options.slice(*%i(user password host port dbname))
   end
 
   def conn_str
@@ -131,18 +188,37 @@ class Dba::ConnBuilder
     end
   end
 
-  class ResultStatus
-    attr_reader :result, :failed
+  class ConnectError < StandardError; end
+  class DbNotExistError < ConnectError; end
 
-    def initialize(e)
+  class ResultStatus
+    attr_reader :result, :conn
+
+    def initialize(e, conn: nil)
+      @conn = conn
       @result = e 
-      if failed? && ENV['DEBUG']
+      if failed?
         puts "==fail: #{e.class} #{e.message}!" 
       end
     end
 
     def failed?
       @result.is_a?(Exception)
+    end
+
+    # sql result values
+    def values
+      return if failed?
+      result.values
+    end
+
+    # todo beautiful table
+    def output
+      return unless values
+      values.each do |r|
+        puts r.join ' '
+      end
+      nil
     end
 
     #ERROR:  permission denied for schema data
@@ -154,6 +230,15 @@ class Dba::ConnBuilder
 
     def allowed?
       !denied?
+    end
+
+    def close
+      conn&.close!
+      self
+    end
+
+    def to_s
+      result.to_s
     end
 
     def method_missing(name, *args, &blk)

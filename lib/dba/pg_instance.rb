@@ -2,36 +2,38 @@ require 'fileutils'
 
 class Dba::PgInstance
   attr_reader :options, :conn_hash
-  attr_reader :initdb_path, :pgctl_path, :psql_path, 
-              :createuser_path, :createdb_path, :data_dir
+  attr_accessor :cmds, :data_dir
 
   DEFAULT_CONN_HASH = {
     scheme: 'postgres',
     host:   '0.0.0.0',
     port:   7654, # dynamic???
     user:   'dbauser',
-    dbname: 'try'
+    dbname: 'dbauser'
   }
   attr_reader *DEFAULT_CONN_HASH.keys
 
   def initialize(opts = {})
-    @options         = opts
-    @initdb_path     = opts.fetch(:initdb_path) { shell_out('which initdb') }
-    @pgctl_path      = opts.fetch(:pgctl_path) { shell_out('which pg_ctl') }
-    @psql_path       = opts.fetch(:psql_path) { shell_out('which psql') }
-    @pg_isready_path = opts.fetch(:isready_path) { shell_out('which pg_isready') }
-    @createuser_path = opts.fetch(:createuser_path) { shell_out('which createuser') }
-    @createdb_path   = opts.fetch(:createdb_path) { shell_out('which createdb') }
-
+    @options = opts
     @conn_hash = {}
     DEFAULT_CONN_HASH.each do |k, v|
       val = opts[k] || opts[k.to_s] || v
       instance_variable_set("@#{k}", val)
       @conn_hash[k] = val
     end
-    @data_dir        = opts.fetch(:data_dir) { "/tmp/pg_instance_#{@port}" }
 
-    raise 'please install postgresql' unless @initdb_path && !@initdb_path.empty?
+    @cmds = {}
+    @data_dir = opts.fetch(:data_dir){ "/tmp/pg_instance_#{@port}" }
+  end
+
+  def self.setup(opts = {})
+    pg = new(opts)
+    pg.setup
+    if block_given?
+      yield pg 
+      pg.cleanup!
+    end
+    pg
   end
 
   def setup()
@@ -47,11 +49,11 @@ class Dba::PgInstance
   end
 
   def initdb()
-    shell_out "#{@initdb_path} #{@data_dir} -A trust -E utf-8"
+    shell_out "#{cmd_path(:initdb)} #{@data_dir} -A trust -E utf-8"
   end
 
   def rundb()
-    pid = Process.fork { shell_out "#{@pgctl_path} start -o '-p #{port}' -D #{@data_dir}" }
+    pid = Process.fork { shell_out "#{cmd_path(:pg_ctl)} start -o '-p #{port}' -D #{@data_dir}" }
     # give a second for postgresql to startup
     sleep(1)
     Process.detach(pid)
@@ -61,34 +63,44 @@ class Dba::PgInstance
   def wait_until_ready(ttl = 30)
     past = 0
     while past < ttl 
-      break if check_ready
-      sleep 1
-      past += 1
-      printf "\rWaiting pg ready: #{past} seconds"
+      break if is_ready?
+      step = 0.5
+      sleep step
+      past += step
+      printf "\rWaiting #{past} seconds to pg ready"
     end
-    puts
   end
 
-  def check_ready
-    system "#{@pg_isready_path} -h #{host} -p #{port} > /dev/null"
+  def is_ready?
+    system "#{cmd_path(:pg_isready)} -h #{host} -p #{port} > /dev/null"
   end
 
   def setup_init_user()
-    shell_out "#{@createuser_path} -s -p #{port} -l #{user} -w"
+    shell_out "#{cmd_path(:createuser)} -s -p #{port} -l #{user} -w"
   end
 
   def setup_init_database()
-    shell_out "#{@createdb_path} -p #{port} #{dbname} -O #{user}"
+    shell_out "#{cmd_path(:createdb)} -p #{port} #{dbname} -O #{user}"
   end
 
-  def cleanup()
-    shell_out "#{@pgctl_path} stop -m fast -o '-p #{port}' -D #{data_dir}"
+  def cleanup!()
+    shell_out "#{cmd_path(:pg_ctl)} stop -m fast -o '-p #{port}' -D #{data_dir}"
     remove_data_dir
   end
-  alias_method :teardown, :cleanup
+  alias_method :teardown, :cleanup!
 
   def remove_data_dir()
     FileUtils.remove_dir(@data_dir)
+  end
+
+  # eg. initdb pg_ctl psql
+  def cmd_path(name = :psql)
+    name = name.to_sym
+    val = @cmds[name]
+    return val if val
+    val = options[name] || shell_out("which #{name}")
+    raise "#{name} not found!" unless val
+    @cmds[name] = val
   end
 
   private

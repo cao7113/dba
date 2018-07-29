@@ -1,0 +1,14 @@
+---
+# put in ~/.dbs.yml or confg env-var DBSFILE
+default:
+  _group_prefix:
+  try:
+    url: postgres://localhost
+group1:
+  db1:
+    url: postgres://localhost
+  db2:
+    url: postgres://localhost
+group2:
+  db1:
+    url: postgres://localhost

@@ -1,70 +1,97 @@
 #!/usr/bin/env ruby
-require 'byebug'
-require 'thor'
-$:.unshift File.join(__dir__, '../lib')
-require 'dba'
+require_relative '../boot'
 
 class DbaCLI < Thor
-  default_command :ls
-  map "-l" => :list 
+  map ["-l", :list] => :ls
 
-  desc 'names', 'list db names'
-  def names
-    puts $dbs.keys
-  end
-
-  desc 'ls', 'list dbs'
-  def ls
-    puts $dbs.values.map(&:to_s)
-  end
-
-  desc 'info [DB]', 'list db info'
-  def info(db = nil)
-    puts get_conn_builder(db).info
-  end 
-  
-  desc 'url', 'get db url'
-  def url(db = nil)
-    puts get_conn_builder(db).url
-  end
-
-  desc 'cli', 'into db cli'
-  def cli(db = nil)
-    get_conn_builder(db).cli
-  end
-
-  desc 'link URL', 'link to a url directly'
-  def link(url = nil)
-    connb = Dba::ConnBuilder.new(url: url)
-    connb.cli
-  end
-
-  desc 'debug', 'debug db tool'
-  def debug
-    byebug
-    puts
-  end
-end
-
-require 'pathname'
-require 'yaml'
-
-def load_dbs!(fpath)
-  abort "" unless fpath.exist?
-  dbs = {}
-
-  hash = YAML.load_file(fpath)
-  hash.each do |g, items|
-    items.each do |name, opts|
-      conn_builder = Dba::ConnBuilder.new(opts)
-      conn_builder.connid = [g, name].join('_')
-      dbs[conn_builder.connid] = conn_builder
+  desc 'ls [DB]', 'list db names'
+  def ls(db = nil)
+    if db
+      conn = get_conn_builder(db)
+      puts "#{db} #{conn.url}"
+    else
+      puts $dbs.keys
     end
   end
-  dbs
+
+  desc 'url [DB]', 'get db url'
+  def url(db = nil)
+    if db
+      puts get_conn_builder(db).url
+    else
+      puts $dbs.values.map(&:url)
+    end
+  end
+
+  desc 'cli [DB_or_URL]', 'into db cli'
+  option :sequel, type: :boolean, banner: 'use sequel', aliases: [:seq]
+  option :psql, type: :boolean, banner: 'use psql'
+  option :runner, default: 'pgcli', banner: '[psql|sequel| pgcli]'
+  def cli(db = nil)
+    conn = get_conn_builder(db)
+    runner = 'sequel' if options[:sequel]
+    runner = 'psql' if options[:psql]
+    runner ||= options[:runner]
+    conn.cli(runner: runner)
+  end # def
+
+  desc 'runsqlet FILE URL', 'run ruby file or stdin'
+  option :code, banner: 'db script to run', aliases: [:c]
+  def runsqlet(file = nil, url = nil)
+    code = options[:code]
+    if code # high priority
+      url = file
+      file = nil
+    else
+      fpath = Pathname(file)
+      code = fpath.read
+    end
+    conn = get_conn_builder(url)
+    runner = conn.script_runner
+    bd = runner.get_binding
+    if file
+      eval code, bd, file
+    else
+      eval code, bd
+    end
+  end
+
+  desc 'runsql [FILE] [URL]', 'run ruby file or stdin'
+  option :code, banner: 'sql script', aliases: [:c]
+  option :line, banner: 'line by line', aliases: [:l]
+  def runsql(file = nil, url = nil)
+    code = options[:code]
+    if code
+      url = file
+      file = nil
+    else
+      fpath = Pathname(file)
+      code = fpath.read.split("\n").map do |l|
+        next if l =~ /^\s*[#\-]/
+        next if l =~ /^\s*$/
+        l
+      end.compact.join("\n")
+    end
+    conn = get_conn_builder(url)
+    if options[:line]
+      codes = code.split(/;/m)
+    else
+      codes = [code]
+    end
+    codes.each_with_index do |seg, idx|
+      puts "==#{idx} run sql"
+      puts seg
+      r = conn.run_sql seg
+      puts "==result"
+      puts r.output
+    end
+  end
 end
 
 def get_conn_builder(db = nil)
+  if Dba::Util.is_url?(db)
+    return Dba::ConnectionBuilder.new(url: db)
+  end 
   db ||= ENV['db']
   unless db
     names = $dbs.keys
@@ -85,9 +112,5 @@ rescue LoadError => e
   #retry
   warn e
 end
-
-dbsfile = ENV['DBSFILE'] || '~/.pconf/dbs.yml'
-fpath = Pathname(dbsfile).expand_path
-$dbs = load_dbs!(fpath)
 
 DbaCLI.start

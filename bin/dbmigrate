@@ -1,0 +1,120 @@
+#!/usr/bin/env ruby
+require_relative '../boot'
+
+$dbroot  = ENV['DB_ROOT'] || Pathname(__dir__).join('../db') #
+
+# self is Sequel::Database 
+class DbMigCLI < Thor
+  desc 'gen DB NAME', 'generate a migration file for db'
+  def gen(db, migname)
+    tmpl = DATA.read
+    result = ERB.render(tmpl, binding)
+    
+    ts = Time.now.strftime("%Y%m%d%H%M%S")
+    fname = "#{ts}_#{migname}.rb"
+    fpath = mig_path(db).join(fname)
+    fpath.write(result)
+    puts "=> #{fpath.to_s} generated"
+    exec "vi #{fpath.to_s}"
+  end
+
+  desc 'ls DB', 'list migration files'
+  def ls(db='try', opts = '')
+    exec "ls #{opts} #{mig_path(db).to_s}"
+  end
+
+  desc 'doc', 'open doc'
+  def doc
+    cmd = "open http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html "
+    puts "http://sequel.jeremyevans.net/documentation.html"
+    puts cmd
+    exec cmd
+  end
+
+  map "migrate" => :up
+  desc 'up DB URL', 'run migrations'
+  option :version, banner: 'run to version, 0 to down all', aliases: [:v]
+  def up(db, url = 'try', ver: nil)
+    dburl = get_dburl(url)
+    version = options[:version] || ver
+
+    path = mig_path(db)
+    cmd = "sequel -m #{path.to_s}"
+    cmd += " -M #{version}" if version
+    cmd += " #{dburl}" 
+    puts cmd
+    #exec cmd
+    %x( #{cmd} )
+  end
+
+  desc 'reset DB URL', 'reset db, rollback all migrations'
+  def reset(db = 'try', url = 'try')
+    up(db, url, ver: 0) # FIXME
+  end
+
+  desc 'seed DB URL', 'seed data'
+  def seed(db = 'try', url = 'try')
+    path = db_path(db).join('seed.rb')
+    cmd = "#{path.to_s} #{url}"
+    puts cmd
+    system cmd
+  end
+
+  desc 'dump [URL]', 'dump db schema'
+  def dump(url = 'try')
+    dburl = get_dburl(url)
+    cmd = "sequel -D #{dburl}" # use vendor specific
+    puts cmd
+    exec cmd
+  end
+
+  desc 'initdb DB', 'init db'
+  option :adminurl, default: 'default_admin', banner: 'admin url'
+  def initdb(db)
+    sql = "create database #{db};"
+    ipath = db_path(db).join("init.sql")
+    sql = ipath.read if ipath.exist?
+
+    url = options[:adminurl]
+    dburl = get_dburl(url)
+    conn = Dba::ConnectionBuilder.new(url: dburl)
+    result = conn.run_sql(sql)
+    puts "==run on #{dburl}:"
+    puts sql
+    puts result
+  end
+
+  no_commands do
+    def mig_path(db)
+      db_path(db).join('migrate')
+    end
+
+    def db_path(db)
+      $dbroot.join(db)
+    end
+
+    def get_dburl(db)
+      return db if Dba::Util.is_url?(db)
+      `dbcli url #{db}`.chomp
+    end
+  end
+end
+DbMigCLI.start
+
+__END__
+# http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html
+Sequel.migration do
+  up do
+    # extension :pg_enum
+    create_table(:todos) do
+      primary_key :id
+      String :name, null: false
+      DateTime :created_at, default: Sequel::CURRENT_TIMESTAMP #, :index=>true
+      Datetime :updated_at, default: Sequel::CURRENT_TIMESTAMP
+    end
+  end
+
+  down do
+    drop_table(:todos)
+  end
+end
