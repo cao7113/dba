@@ -4,14 +4,14 @@ require_relative '../boot'
 class PgbackCLI < Thor
   map ["-l", :list] => :ls
 
-  desc 'ls', 'list backup'
+  desc 'ls url', 'list backups'
   def ls(url)
     conn = get_conn(url)
     dir = db_home(conn)
     system "ls -l #{dir}"
   end
 
-  desc 'up', ''
+  desc 'up url', 'make a backup'
   option :autoclean, type: :boolean, default: true
   def up(url)
     conn = get_conn(url)
@@ -23,7 +23,7 @@ class PgbackCLI < Thor
     end
   end
 
-  desc 'clean', ''
+  desc 'clean url', 'clean old backups'
   option :size, default: 3
   def clean(url)
     conn = get_conn(url)
@@ -32,7 +32,7 @@ class PgbackCLI < Thor
     invoke(:ls, [url])
   end
 
-  desc '', 'get home'
+  desc 'home [url]', 'get db backup home'
   def home(url=nil)
     if url
       conn = get_conn(url)
@@ -42,8 +42,8 @@ class PgbackCLI < Thor
     end
   end
 
-  desc '', ''
-  def latest_path(url)
+  desc 'latest url', 'latest backup path'
+  def latest(url)
     conn = get_conn(url)
     puts db_home(conn).join(latest_version(conn))
   end
