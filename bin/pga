@@ -212,9 +212,14 @@ class PgaCLI < Thor
   option :restart, type: :boolean, default: true
   option :only, type: :boolean, default: true
   option :sql_copy, type: :boolean, default: true
-  option :limit
+  option :limit, banner: 'limit count'
+  option :limit_big_count, type: :boolean, default: false
   def copy_table(src_url, dest_url, table, dtable = table)
-    return unless prompter.yes?("Are you sure to truncate then append #{dtable}?")
+    unless dryrun
+      unless prompter.yes?("Are you sure to truncate then append #{dtable}?")
+        return 
+      end
+    end
     src_url = get_dburl(src_url)
     src_conn = Dba::ConnectionBuilder.new(url: src_url)
     dest_url = allow_local_db_url(dest_url)
@@ -222,11 +227,13 @@ class PgaCLI < Thor
     
     limit = options[:limit]
     unless limit
-      count = src_conn.table_count(table)
-      max = 2000
-      if count > max
-        warn "==limit 1000 for #{count} records!"
-        limit = max
+      if options[:limit_big_count]
+        count = src_conn.table_count(table)
+        max = 2000
+        if count > max
+          warn "==limit 1000 for #{count} records!"
+          limit = max
+        end
       end
     end
 
@@ -287,13 +294,15 @@ class PgaCLI < Thor
       cmds = Array(cmds) unless cmds.is_a?(Array)
       return cmds unless options[:_init_task]
 
+      time0 = Time.now
       unless dryrun
         cmds.each do |cmd|
           system cmd
         end
       end
+      taken = Time.now - time0
 
-      puts "# cmds to run:"
+      puts "# run below cmds in #{taken} seconds:"
       puts cmds.join(";\n")
 
       cmds

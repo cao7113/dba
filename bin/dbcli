@@ -26,7 +26,7 @@ class DbaCLI < Thor
   desc 'cli [DB_or_URL]', 'into db cli'
   option :sequel, type: :boolean, banner: 'use sequel', aliases: [:seq]
   option :psql, type: :boolean, banner: 'use psql'
-  option :runner, default: 'pgcli', banner: '[psql|sequel| pgcli]'
+  option :runner, banner: '[psql|sequel|pgcli]'
   def cli(db = nil)
     conn = get_conn_builder(db)
     runner = 'sequel' if options[:sequel]
