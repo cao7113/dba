@@ -46,7 +46,7 @@ class PgaCLI < Thor
     handle_cmds(cmds)
   end
 
-  desc 'ddl src_url [dest_url]', ''
+  desc 'copy_ddl src_url dest_url', 'copy ddl between dbs'
   def copy_ddl(src_url, dest_url)
     cmds = []
     dest_url = allow_local_db_url(dest_url)
@@ -133,7 +133,7 @@ class PgaCLI < Thor
     handle_cmds(cmds)
   end
 
-  desc 'copy src_url dest_url', 'transfer between dbs'
+  desc 'copy src_url dest_url', 'copy db between dbs'
   def copy(src_url, dest_url)
     cmds = []
     dest_url = allow_local_db_url(dest_url)
@@ -206,7 +206,7 @@ class PgaCLI < Thor
     puts "result write to #{dfile}"
   end
 
-  desc 'copy_table src_url dest_url table [dest_table]', 'copy table table data'
+  desc 'copy_table src_url dest_url table [dest_table]', 'copy table data between dbs'
   option :truncate, type: :boolean, default: true
   option :cascade, type: :boolean, default: true
   option :restart, type: :boolean, default: true

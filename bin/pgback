@@ -4,10 +4,14 @@ require_relative '../boot'
 class PgbackCLI < Thor
   map ["-l", :list] => :ls
 
-  desc 'ls url', 'list backups'
-  def ls(url)
-    conn = get_conn(url)
-    dir = db_home(conn)
+  desc 'ls [url]', 'list backups'
+  def ls(url=nil)
+    if url
+      conn = get_conn(url)
+      dir = db_home(conn)
+    else
+      dir = backup_home
+    end
     system "ls -l #{dir}"
   end
 
