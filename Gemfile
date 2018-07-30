@@ -12,8 +12,10 @@ def gem_fork(name, opts = {})
   end
 end
 
+group :development do
+  gem "byebug"
+end
 ## tools
-gem "byebug"
 #gem 'pry'
 #gem 'pry-doc'
 #gem 'pry-stack_explorer'
@@ -40,4 +42,6 @@ gem "sequel"
 #gem 'standalone_migrations'
 
 ## test
-gem "rspec"
+group :test do
+  gem "rspec"
+end

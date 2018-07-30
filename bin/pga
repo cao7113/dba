@@ -36,14 +36,11 @@ class PgaCLI < Thor
     cmds = []
     check_url!(dest_url)
     ensure_no_dest_db(dest_url)
-
-    cmds << "#{sql_cmd} --file=#{sqlfile} --single-transaction --dbname #{dest_url}"
-
     unless dryrun
       dest_conn = Dba::ConnectionBuilder.new(url: dest_url)
       create_db_before_restore(dest_conn) 
     end
-
+    cmds << "#{sql_cmd} --file=#{sqlfile} --single-transaction --dbname #{dest_url}"
     handle_cmds(cmds)
   end
 
@@ -106,7 +103,7 @@ class PgaCLI < Thor
       end
     end
 
-    cmds << "#{restore_cmd} --no-owner --data-only --format=d #{jobs_opts} --verbose --dbname=#{dest_url} #{data_dir};"
+    cmds << "#{restore_cmd} --no-owner --data-only --format=d #{jobs_opts} #{verbose_cmd_opts} --dbname=#{dest_url} #{data_dir};"
     handle_cmds(cmds)
   end
 
@@ -286,6 +283,27 @@ class PgaCLI < Thor
     end
   end
 
+  # sample: pga fork src1 dest1 --dump-opts='--schema public'
+  desc 'fork src_url dest_url', 'fork db using pg_dump then restore in parallel'
+  def fork(src_url, dest_url)
+    cmds = []
+    src_url = get_dburl(src_url)
+    src_conn = Dba::ConnectionBuilder.new(url: src_url)
+
+    dest_url = allow_local_db_url(dest_url)
+    ensure_no_dest_db(dest_url)
+    unless dryrun
+      dest_conn = Dba::ConnectionBuilder.new(url: dest_url)
+      create_db_before_restore(dest_conn) 
+    end
+
+    dump_dir = tmp_path("#{src_conn.unique_id}-fork")
+    cmds << "mkdir -p #{dump_dir}"
+    cmds << "#{dump_cmd} --no-owner --no-privileges #{jobs_opts} --format=d --file=#{dump_dir} #{verbose_cmd_opts} #{options[:dump_opts]} #{src_conn.url};"
+    cmds << "#{restore_cmd} --no-owner --format=d #{jobs_opts} #{verbose_cmd_opts} --dbname=#{dest_url} #{dump_dir};"
+    handle_cmds(cmds)
+  end
+
   desc 'test URL', 'test url'
   def test(url)
     puts allow_local_db_url(url)
@@ -303,7 +321,7 @@ class PgaCLI < Thor
         src_url = get_dburl(src_url)
         src_conn = Dba::ConnectionBuilder.new(url: src_url)
       end
-      dump_dir ||= tmp_path(src_conn.dbdomain).to_s
+      dump_dir ||= tmp_path(src_conn.unique_id).to_s
       cmd = "mkdir -p #{dump_dir}"
       [src_conn, dump_dir, cmd]
     end
