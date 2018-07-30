@@ -171,7 +171,7 @@ class PgaCLI < Thor
   option :limit, banner: 'try num'
   option :bigger_than, banner: 'bigger than xx M'
   option :show, type: :boolean, banner: 'display current'
-  def datafile(src_url, file = nil)
+  def gen_datafile(src_url, file = nil)
     src_url = get_dburl(src_url)
     src_conn = Dba::ConnectionBuilder.new(url: src_url)
 

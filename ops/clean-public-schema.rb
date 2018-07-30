@@ -23,5 +23,4 @@ end
 ## archiv db
 # pga fork starup_production xxx/agentcloud_legacy201808 --dump-opts='--schema public'
 
-
-## danage clean tables
+## danage!! clean tables
