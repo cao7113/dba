@@ -287,7 +287,7 @@ class PgaCLI < Thor
   desc 'fork src_url dest_url', 'fork db using pg_dump then restore in parallel'
   def fork(src_url, dest_url)
     cmds = []
-    src_url = get_dburl(src_url)
+    src_url = allow_local_db_url(src_url)
     src_conn = Dba::ConnectionBuilder.new(url: src_url)
 
     dest_url = allow_local_db_url(dest_url)
