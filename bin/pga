@@ -261,6 +261,11 @@ class PgaCLI < Thor
     end
   end
 
+  desc 'test URL', 'test url'
+  def test(url)
+    puts allow_local_db_url(url)
+  end
+
   no_commands do
     def prompter
       @prompter ||= TTY::Prompt.new
@@ -352,6 +357,8 @@ class PgaCLI < Thor
       if Dba::Util.is_url?(url)
         url
       else
+        dburl = get_dburl(url)
+        return dburl if dburl
         # suppose url is dbname
         "postgres://localhost/#{url}"
       end
@@ -369,7 +376,8 @@ class PgaCLI < Thor
 
     def get_dburl(db)
       return db if Dba::Util.is_url?(db)
-      `dbcli url #{db}`.chomp
+      url = `dbcli url #{db}`.chomp
+      url == '' ? nil : url
     end
 
     def tmp_path(prefix = 'pgdump')

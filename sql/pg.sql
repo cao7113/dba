@@ -37,6 +37,9 @@ select "current_schema"();
 -- ALTER SCHEMA name OWNER TO { new_owner | CURRENT_USER | SESSION_USER }
 -- 删除模式及其所有对象，请使用级联删除
 -- DROP SCHEMA mystuff CASCADE;
+-- list all schemas
+-- select schema_name from information_schema.schemata;
+-- select nspname from pg_catalog.pg_namespace;
 
 -- ## table
 -- CREATE TABLE tmp1 (id serial, name text);

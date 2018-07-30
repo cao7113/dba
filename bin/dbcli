@@ -17,7 +17,7 @@ class DbaCLI < Thor
   desc 'url [DB]', 'get db url'
   def url(db = nil)
     if db
-      puts get_conn_builder(db).url
+      puts get_conn_builder(db)&.url
     else
       puts $dbs.values.map(&:url)
     end
