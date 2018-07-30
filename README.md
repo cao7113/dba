@@ -1,4 +1,4 @@
-# Dba, my db tools, powered by ruby
+# Dba, our db tools, powered by ruby
 
 ## Features
 
