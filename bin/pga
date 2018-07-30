@@ -11,6 +11,7 @@ class PgaCLI < Thor
   class_option :use_datafile, type: :boolean, default: true
   # FIXME 为解决命令互调时判断是否是初始触发命令
   class_option :_init_task, type: :boolean, default: true, banner: 'init task'
+  class_option :dump_opts, banner: 'dump extra options'
 
   desc 'dump_ddl src_url [dump_dir]', 'dump ddl to a sql file'
   def dump_ddl(src_url, dump_dir = nil)
@@ -84,7 +85,7 @@ class PgaCLI < Thor
       end
     end
 
-    cmds << "#{dump_cmd} --no-owner --data-only #{jobs_opts} --format=d --file=#{data_dir} #{verbose_cmd_opts} #{ex_opts} #{src_conn.url};"
+    cmds << "#{dump_cmd} --no-owner --data-only #{jobs_opts} --format=d --file=#{data_dir} #{verbose_cmd_opts} #{ex_opts} #{options[:dump_opts]} #{src_conn.url};"
 
     handle_cmds(cmds)
     {
@@ -107,6 +108,22 @@ class PgaCLI < Thor
 
     cmds << "#{restore_cmd} --no-owner --data-only --format=d #{jobs_opts} --verbose --dbname=#{dest_url} #{data_dir};"
     handle_cmds(cmds)
+  end
+
+  # copy table data: --dump-opts='--table fundings' --dryrun
+  desc 'copy_data SRC_URL DEST_URL', 'copy data between dbs'
+  def copy_data(src_url, dest_url)
+    cmds = []
+    dest_url = allow_local_db_url(dest_url)
+    data_info = invoke(:dump_data, [src_url], options.merge(_init_task: false, use_datafile: false))
+    cmds += data_info[:cmds]
+    cmds += invoke(:restore_data, [dest_url, data_info[:data_dir]], options.merge(_init_task: false))
+    handle_cmds(cmds)
+  end
+
+  desc 'copy_table_data src_url dest_url table', 'copy table data use dump method'
+  def copy_table_data(src_url, dest_url, table)
+    invoke(:copy_data, [src_url, dest_url], options.merge(dump_opts: "--table #{table}"))
   end
 
   desc 'dump src_url [dump_dir]', 'dump db to a dir'
@@ -247,6 +264,7 @@ class PgaCLI < Thor
       if truncate
         trunc_clause = "truncate table only #{dtable} restart identity cascade; " 
       end
+      # todo 大表是否要先转存到文件以防内存徒增？？？
       cmds << "#{sql_cmd} --command 'copy #{clause} TO STDOUT;' #{src_url} | 
                #{sql_cmd} --command '#{trunc_clause} copy #{dtable} from STDIN;' #{dest_url}"
       handle_cmds(cmds)
@@ -290,14 +308,16 @@ class PgaCLI < Thor
       [src_conn, dump_dir, cmd]
     end
 
-    def handle_cmds(cmds)
+    def handle_cmds(cmds, dry: false)
       cmds = Array(cmds) unless cmds.is_a?(Array)
       return cmds unless options[:_init_task]
 
       time0 = Time.now
       unless dryrun
-        cmds.each do |cmd|
-          system cmd
+        unless dry
+          cmds.each do |cmd|
+            system cmd
+          end
         end
       end
       taken = Time.now - time0
