@@ -52,6 +52,10 @@ select "current_schema"();
 -- CREATE TABLE films2 AS TABLE films;
 -- CREATE TABLE films_recent AS SELECT * FROM films WHERE date_prod >= '2002-01-01';
 
+-- primary key
+-- create table t1 (id serial primary key);
+-- create table t2 (order_id int, item_id int, primary key (order_id, item_id));
+-- \d+ t2
 
 -- ## Stat & Monitor
 -- pghero
