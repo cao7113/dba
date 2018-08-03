@@ -215,7 +215,7 @@ class PgaCLI < Thor
     puts "result write to #{dfile}"
   end
 
-  desc 'copy_table_data src_url dest_url table [dest_table]', 'copy table data between dbs'
+  desc 'copy_table_data src_url dest_url table [dest_table]', 'copy table data between dbs with limit support'
   option :truncate, type: :boolean, default: true
   option :cascade, type: :boolean, default: true
   option :restart, type: :boolean, default: true
@@ -278,7 +278,7 @@ class PgaCLI < Thor
     end
   end
 
-  desc 'copy_table_data2 src_url dest_url table', 'copy table data use dump method'
+  desc 'copy_table_data2 src_url dest_url table', 'copy table data using dump method'
   def copy_table_data2(src_url, dest_url, table)
     invoke(:copy_data, [src_url, dest_url], options.merge(_init_task: false, 
                                                           dump_opts: "--table #{table}"))
