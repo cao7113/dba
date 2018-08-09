@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+require 'byebug'
 require_relative '../boot'
 
 class DbaCLI < Thor

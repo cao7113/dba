@@ -93,6 +93,16 @@ class Dba::ConnectionBuilder
     case dbtype
     when /^postgres/
       Dba::DbCli.exec url, runner: runner
+    when /^redis/ 
+      # todo
+      #Dba::DbCli.exec url, runner: 'redis-cli'
+      runner = 'redis-cli'
+      cmd = "#{runner} -h #{host}" 
+      cmd += " -a #{password}" if password
+      cmd += " -p #{port}" if port
+      cmd += " -n #{dbname}" if dbname
+      puts cmd
+      system cmd
     end
   end
 
