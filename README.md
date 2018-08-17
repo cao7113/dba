@@ -35,9 +35,9 @@ rspec spec/try_db_spec.rb
 ### pull staging db to local
 
 * `pga gen_datafile postgres://xxx/to_staging_db` 
-  生产大表过滤规则, 对超过500M的库建议本地的过滤规则
+  生成大表过滤规则文件(如`.datafiles/starup.pg.staging.localdomain.5432.yml`)
 * `pga copy postgres://src_staging_db_url/db1 postgres://localhost/new_not_exist_db1 --dryrun` 
-  会生产导出shell语句，去掉dryrun可立即copy，会定制生产的shell语句
+  会生成导出shell语句，去掉--dryrun可立即copy，会定制生产的shell语句
 
 ## Inspired by
 
