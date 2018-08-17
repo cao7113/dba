@@ -11,8 +11,8 @@ namespace :sequel do
   end
 end
 
-task :cpdbsh do
-  exec "pga copy try destr_db1 --dryrun"
+task :dbsh do
+  puts "pga copy postgres://src_db_url/db1 postgres://localhost_or_dest/new_db1 --dryrun"
 end
 
 task :conn do
