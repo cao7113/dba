@@ -30,6 +30,15 @@ sql/demo.rb
 rspec spec/try_db_spec.rb 
 ```
 
+## Used in starup
+
+### pull staging db to local
+
+* `pga gen_datafile postgres://xxx/to_staging_db` 
+  生产大表过滤规则, 对超过500M的库建议本地的过滤规则
+* `pga copy postgres://src_staging_db_url/db1 postgres://localhost/new_not_exist_db1 --dryrun` 
+  会生产导出shell语句，去掉dryrun可立即copy，会定制生产的shell语句
+
 ## Inspired by
 
 * https://github.com/Microsoft/pgtester
