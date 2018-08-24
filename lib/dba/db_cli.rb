@@ -6,8 +6,8 @@ module Dba::DbCli
     system cmd
   end
 
-  # support: psql, pgcli, sequel
+  # support: psql, pgcli, sequel...
   def self.env_runner
-    ENV['SQL_RUNNER'] || ENV['sql_runner'] || 'pgcli'
+    ENV['SQL_RUNNER'] || ENV['sql_runner']
   end
 end

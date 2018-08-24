@@ -93,14 +93,24 @@ class Dba::ConnectionBuilder
     case dbtype
     when /^postgres/
       Dba::DbCli.exec url, runner: runner
+    # todo
     when /^redis/ 
-      # todo
       #Dba::DbCli.exec url, runner: 'redis-cli'
       runner = 'redis-cli'
       cmd = "#{runner} -h #{host}" 
       cmd += " -a #{password}" if password
       cmd += " -p #{port}" if port
       cmd += " -n #{dbname}" if dbname
+      puts cmd
+      system cmd
+    when /^mysql/ # or mariadb?
+      #Dba::DbCli.exec url, runner: 'mysql'
+      runner = 'mysql'
+      cmd = "#{runner} -h #{host}" 
+      cmd += " --user=#{user}" if user
+      cmd += " --password=#{password}" if password
+      cmd += " --port=#{port}" if port
+      cmd += " #{dbname}" if dbname
       puts cmd
       system cmd
     end
