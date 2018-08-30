@@ -192,8 +192,10 @@ class Dba::ConnectionBuilder
 
   # https://www.postgresql.org/docs/9.2/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS
   def conn_hash
+    # Hash#slice support after ruby2.5+
     # no scheme required!!!
-    options.slice(*%i(user password host port dbname))
+    #options.slice(*%i(user password host port dbname))
+    options.select{ |i| %i(user password host port dbname).include?(i) }
   end
 
   def conn_str
