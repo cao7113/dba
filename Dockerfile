@@ -7,7 +7,7 @@ RUN apk update && apk add build-base postgresql postgresql-dev
 
 WORKDIR /app
 COPY Gemfile ./
-ENV GEM_SOURCE=http://docker.for.mac.host.internal:8808
+#ENV GEM_SOURCE=http://docker.for.mac.host.internal:8808
 #RUN bundle install --without development test --verbose
 RUN bundle install --verbose
 
