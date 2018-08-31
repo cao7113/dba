@@ -2,11 +2,12 @@
 require 'bundler/inline'
 gemfile do
   source 'https://rubygems.org'
-  gem "byebug"
+  #gem "byebug"
   gem "thor"
 end
-require 'byebug'
+#require 'byebug'
 require 'thor'
+require 'erb'
 
 class DockerDbaCLI < Thor
   #include Thor::Actions
