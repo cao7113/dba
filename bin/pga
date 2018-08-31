@@ -208,7 +208,7 @@ class PgaCLI < Thor
       head_rows_tables: [],
       no_rows_tables: mapping
     }
-    dfile = file || ".datafiles/#{src_conn.unique_id}.yml"
+    dfile = file || "#{default_datafiles_home}/#{src_conn.unique_id}.yml"
     system "mkdir -p #{File.dirname(dfile)}"
     File.write(dfile, result.to_yaml)
     puts result.to_yaml
@@ -418,13 +418,16 @@ class PgaCLI < Thor
       files << ENV['DATAFILE'] if ENV['DATAFILE']
       files.unshift(options[:datafile]) if options[:datafile]
       
-      dir = '.datafiles'
       names = [conn.unique_id, conn.dbdomain, conn.dbname, "default"]
-      files += names.map{ |f| File.join(dir, "#{f}.yml") }
+      files += names.map{ |f| File.join(default_datafiles_home, "#{f}.yml") }
       files.each do |f|
         return f if File.exist?(f)
       end
       nil
+    end
+
+    def default_datafiles_home
+      'datafiles'
     end
 
     def check_url!(url)

@@ -34,7 +34,7 @@ rspec spec/try_db_spec.rb
 
 ```
 dockerdba down # get image
-# config ~/.dbs.yml file with a docker_test db
+# config ~/.dbs.yml with a docker_test db item
 dockerdba try
 # write your scripts by dockerdba/try.sh
 ```

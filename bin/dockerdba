@@ -75,7 +75,7 @@ class DockerDbaCLI < Thor
     end
 
     def docker_run_sh(script)
-      tmpdir = Pathname.pwd.join('tmp/docker')
+      tmpdir = Pathname.pwd.join('tmp/dockerdba')
       tmpdir.mkpath
 
       ts = Time.now.strftime("%Y%m%d%H%M%S")
