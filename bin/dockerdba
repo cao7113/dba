@@ -1,10 +1,11 @@
 #!/usr/bin/env ruby
-#require 'byebug'
 require 'bundler/inline'
 gemfile do
   source 'https://rubygems.org'
+  gem "byebug"
   gem "thor"
 end
+require 'byebug'
 require 'thor'
 
 class DockerDbaCLI < Thor
@@ -22,36 +23,23 @@ class DockerDbaCLI < Thor
     end
   end
 
+  desc 'sh', 'provide container shell for interactive commands'
+  def sh
+    docker_run_sh nil, keep: true
+  end
+
   desc 'try', 'try run dba in container'
   option :keep, type: :boolean, default: false, aliases: [:k]
   def try
-    invoke :sh, [my_path.join('../dockerdba/try.sh').to_s], options
+    invoke :runscript, [my_path.join('../dockerdba/try.sh').to_s], options
   end
 
-  desc 'sh', 'exec sh script in container'
+  desc 'runscript FILE', 'run sh script in container'
   option :keep, type: :boolean, default: false, aliases: [:k], banner: 'keep in container shell after run'
-  def sh(file) #runscript
-    user_script = Pathname(file).read
-    dock_tmpl = <<~Sh
-      #!/usr/bin/env sh
-      echo ==Welcome to container shell
-      export DBSFILE=/dbs.yml
-
-      #### BEGIN user input script
-      <%=user_script%>
-      #### END user input script
-
-      <% if options[:keep] %>
-      echo 
-      export PS1=docker:$PS1
-      echo ==You are in container shell
-      sh # wait your command
-      <% end %>
-      echo ==Bye from container shell
-    Sh
-    docker_script = ERB.new(dock_tmpl, nil, '%<>').result(binding)
-    docker_run_sh docker_script
-    puts docker_script if options[:dev]
+  def runscript(file)
+    script = Pathname(file).read
+    dock_script = docker_run_sh(script)
+    puts dock_script if options[:dev]
   end
 
   desc 'which', 'this command path'
@@ -74,19 +62,38 @@ class DockerDbaCLI < Thor
       Pathname(options[:dbsfile] || '~/.dbs.yml').expand_path
     end
 
-    def docker_run_sh(script)
+    def docker_run_sh(user_script, opts = options)
+      dock_tmpl = <<~Sh
+        #!/usr/bin/env sh
+        echo ==Welcome to container shell
+        export DBSFILE=/dbs.yml
+
+        #### BEGIN user input script
+        <%=user_script%>
+        #### END user input script
+
+        <% if opts[:keep] %>
+        echo 
+        export PS1=docker:$PS1
+        echo ==You are in container shell
+        sh # wait your command
+        <% end %>
+        echo ==Bye from container shell
+      Sh
+      dock_script = ERB.new(dock_tmpl, nil, '%<>').result(binding)
+
       tmpdir = Pathname.pwd.join('tmp/dockerdba')
       tmpdir.mkpath
 
       ts = Time.now.strftime("%Y%m%d%H%M%S")
       tfile = tmpdir.join("#{ts}-#{rand(1000)}.sh")
-      tfile.write script
+      tfile.write dock_script
       tfile.chmod(0755)
 
       rfile = tfile.relative_path_from(tmpdir)
       system "docker run -v #{tmpdir.to_s}:/apptmp -v #{dbsfile}:/dbs.yml -w /apptmp --rm -it #{docker_image} ./#{rfile}"
       tfile.delete
-      tfile
+      dock_script
     end
 
     def my_path
