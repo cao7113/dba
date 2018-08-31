@@ -83,7 +83,7 @@ class DockerDbaCLI < Thor
       Sh
       dock_script = ERB.new(dock_tmpl, nil, '%<>').result(binding)
 
-      tmpdir = Pathname.pwd.join('tmp/dockerdba')
+      tmpdir = Pathname.pwd 
       tmpdir.mkpath
 
       ts = Time.now.strftime("%Y%m%d%H%M%S")
@@ -92,7 +92,7 @@ class DockerDbaCLI < Thor
       tfile.chmod(0755)
 
       rfile = tfile.relative_path_from(tmpdir)
-      system "docker run -v #{tmpdir.to_s}:/apptmp -v #{dbsfile}:/dbs.yml -w /apptmp --rm -it #{docker_image} ./#{rfile}"
+      system "docker run -v #{tmpdir.to_s}:/appws -v #{dbsfile}:/dbs.yml -w /appws --rm -it #{docker_image} ./#{rfile}"
       tfile.delete
       dock_script
     end
