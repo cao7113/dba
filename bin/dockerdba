@@ -12,7 +12,7 @@ class DockerDbaCLI < Thor
   #include Thor::Actions
   class_option :image, banner: 'dba docker image'
   class_option :dbsfile, banner: 'db source config file'
-  class_option :dev, type: :boolean, default: true, banner: 'under development'
+  class_option :dev, type: :boolean, default: false, banner: 'under development'
 
   desc 'down', 'get docker image'
   def down

@@ -11,6 +11,12 @@ namespace :sequel do
   end
 end
 
+desc 'run into a dba container sh '
+task :dksh do
+  exec "dockerdba down --dev && dockerdba sh --dev"
+end
+
+desc 'give generated shell commands'
 task :dbsh do
   puts "pga copy postgres://src_db_url/db1 postgres://localhost_or_dest/new_db1 --dryrun"
 end
