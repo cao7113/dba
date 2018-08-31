@@ -4,6 +4,8 @@ default:
   _group_prefix:
   try:
     url: postgres://localhost
+  docker_test:
+    url: postgres://postgres@docker.for.mac.host.internal/postgres
 group1:
   db1:
     url: postgres://localhost

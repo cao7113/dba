@@ -30,6 +30,15 @@ sql/demo.rb
 rspec spec/try_db_spec.rb 
 ```
 
+## Run with docker
+
+```
+dockerdba down # get image
+# config ~/.dbs.yml file with a docker_test db
+dockerdba try
+# write your scripts by dockerdba/try.sh
+```
+
 ## Used in starup
 
 ### pull staging db to local

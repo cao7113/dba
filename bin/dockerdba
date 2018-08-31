@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+#require 'byebug'
+require 'bundler/inline'
+gemfile do
+  source 'https://rubygems.org'
+  gem "thor"
+end
+require 'thor'
+
+class DockerDbaCLI < Thor
+  #include Thor::Actions
+  class_option :image, banner: 'dba docker image'
+  class_option :dbsfile, banner: 'db source config file'
+  class_option :dev, type: :boolean, default: true, banner: 'under development'
+
+  desc 'down', 'get docker image'
+  def down
+    if options[:dev]
+      system "docker build -t #{docker_image} ."
+    else
+      system "docker pull #{docker_image}"
+    end
+  end
+
+  desc 'try', 'try run dba in container'
+  option :keep, type: :boolean, default: false, aliases: [:k]
+  def try
+    invoke :sh, [my_path.join('../dockerdba/try.sh').to_s], options
+  end
+
+  desc 'sh', 'exec sh script in container'
+  option :keep, type: :boolean, default: false, aliases: [:k], banner: 'keep in container shell after run'
+  def sh(file) #runscript
+    user_script = Pathname(file).read
+    dock_tmpl = <<~Sh
+      #!/usr/bin/env sh
+      echo ==Welcome to container shell
+      export DBSFILE=/dbs.yml
+
+      #### BEGIN user input script
+      <%=user_script%>
+      #### END user input script
+
+      <% if options[:keep] %>
+      echo 
+      export PS1=docker:$PS1
+      echo ==You are in container shell
+      sh # wait your command
+      <% end %>
+      echo ==Bye from container shell
+    Sh
+    docker_script = ERB.new(dock_tmpl, nil, '%<>').result(binding)
+    docker_run_sh docker_script
+    puts docker_script if options[:dev]
+  end
+
+  desc 'which', 'this command path'
+  def which
+    puts Pathname(__FILE__)
+  end
+
+  desc 'vi', 'vi command'
+  def vi
+    exec "vi + #{__FILE__}"
+  end
+
+  no_tasks do
+    def docker_image
+      return "dba:pg96" if options[:dev]
+      options[:image] || "cao7113/dba:pg96"
+    end
+
+    def dbsfile
+      Pathname(options[:dbsfile] || '~/.dbs.yml').expand_path
+    end
+
+    def docker_run_sh(script)
+      tmpdir = Pathname.pwd.join('tmp/docker')
+      tmpdir.mkpath
+
+      ts = Time.now.strftime("%Y%m%d%H%M%S")
+      tfile = tmpdir.join("#{ts}-#{rand(1000)}.sh")
+      tfile.write script
+      tfile.chmod(0755)
+
+      rfile = tfile.relative_path_from(tmpdir)
+      system "docker run -v #{tmpdir.to_s}:/apptmp -v #{dbsfile}:/dbs.yml -w /apptmp --rm -it #{docker_image} ./#{rfile}"
+      tfile.delete
+      tfile
+    end
+
+    def my_path
+      Pathname(__dir__)
+    end
+  end
+end
+
+DockerDbaCLI.start
