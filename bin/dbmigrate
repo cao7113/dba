@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 require_relative '../boot'
 
+# todo redesign
 $dbroot  = ENV['DB_ROOT'] || Pathname(__dir__).join('../db') #
 
 # self is Sequel::Database 
@@ -84,6 +85,11 @@ class DbMigCLI < Thor
     puts result
   end
 
+  desc 'initpath', ''
+  def initpath(db)
+    mig_path(db).mkpath
+  end
+
   no_commands do
     def mig_path(db)
       db_path(db).join('migrate')
@@ -110,7 +116,7 @@ Sequel.migration do
       primary_key :id
       String :name, null: false
       DateTime :created_at, default: Sequel::CURRENT_TIMESTAMP #, :index=>true
-      Datetime :updated_at, default: Sequel::CURRENT_TIMESTAMP
+      DateTime :updated_at, default: Sequel::CURRENT_TIMESTAMP
     end
   end
 

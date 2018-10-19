@@ -29,6 +29,6 @@ SQL
 puts "sql result: #{r.output}" 
 
 __END__
-## use Sequel(http://sequel.jeremyevans.net/documentation.html)
+## use Sequel http://sequel.jeremyevans.net/documentation.html
 # sdb = conn.sequel_db
 # sdb.run 'select current_user'
