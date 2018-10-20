@@ -1,45 +1,102 @@
 #!/usr/bin/env ruby
 require_relative '../boot'
-
-# todo redesign
-$dbroot  = ENV['DB_ROOT'] || Pathname(__dir__).join('../db') #
-
-# self is Sequel::Database 
 class DbMigCLI < Thor
-  desc 'gen DB NAME', 'generate a migration file for db'
-  def gen(db, migname)
+  class_option :debug, type: :boolean, aliases: [:d]
+
+  desc 'init', 'init db project structure'
+  def init
+    # /xdbprj/    --current path
+    # |------/db/
+    # |------/db/init.rb
+    # |------/db/migrate/
+    # |------/db/seed.rb
+    mig_path.mkpath
+    puts "inited db prj at #{db_path}"
+  end
+
+  desc 'tree', 'migration files'
+  def tree
+    exec "tree #{db_path}"
+  end
+
+  desc 'test', 'test all'
+  def test(tpath = Pathname(__dir__).join('../tmp/test-dbmigrate'))
+    dbname = "dbmig_test#{Time.now.to_i}"
+    dburl = "postgres://localhost/#{dbname}"
+    adminurl = "postgres://localhost/postgres"
+    puts "working path: #{tpath}"
+    puts "target db: #{dburl} with #{adminurl}"
+
+    cmds = <<~Desc
+      # setup
+      [ -d '#{tpath}' ] && rm -fr #{tpath} 
+      mkdir -p #{tpath} && cd #{tpath}
+      # try ops
+      dbmigrate init
+      dbmigrate generate create_todos
+      dbmigrate initdb #{dbname} --adminurl #{adminurl}
+      dbmigrate migrate #{dburl}
+      dbmigrate tree
+      # clean
+      cat <<-SQL1 > sql123.sql
+        drop database #{dbname}; 
+        select datname from pg_catalog.pg_database;
+      SQL1
+      dbcli runsql sql123.sql #{adminurl}
+      rm -f sql123.sql
+    Desc
+    if options[:debug]
+      puts 
+      puts "# run shell commands"
+      puts cmds
+    else
+      system cmds
+    end
+  end
+
+  desc 't1', ''
+  def t1
+    system <<~Desc
+      cat <<-Abc > f11
+        date
+      Abc
+      cat f11
+      ls -l
+      sh f11
+      rm f11
+      ls -l
+    Desc
+  end
+
+  desc 'generate NAME', 'generate a migration file'
+  option :edit, type: :boolean, aliases: [:e]
+  def generate(migname)
     tmpl = DATA.read
     result = ERB.render(tmpl, binding)
     
     ts = Time.now.strftime("%Y%m%d%H%M%S")
     fname = "#{ts}_#{migname}.rb"
-    fpath = mig_path(db).join(fname)
+    fpath = mig_path.join(fname)
     fpath.write(result)
-    puts "=> #{fpath.to_s} generated"
-    exec "vi #{fpath.to_s}"
+    puts "generated file: #{fpath.to_s}"
+    exec "vi #{fpath.to_s}" if options[:edit]
   end
 
-  desc 'ls DB', 'list migration files'
-  def ls(db='try', opts = '')
-    exec "ls #{opts} #{mig_path(db).to_s}"
-  end
-
-  desc 'doc', 'open doc'
-  def doc
-    cmd = "open http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html "
+  desc 'ref', 'open ref doc'
+  def ref
     puts "http://sequel.jeremyevans.net/documentation.html"
+    cmd = "open http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html "
     puts cmd
     exec cmd
   end
 
-  map "migrate" => :up
-  desc 'up DB URL', 'run migrations'
+  desc 'migrate [URL]', 'run migrations'
   option :version, banner: 'run to version, 0 to down all', aliases: [:v]
-  def up(db, url = 'try', ver: nil)
+  def migrate(url = 'try', ver: nil)
     dburl = get_dburl(url)
     version = options[:version] || ver
 
-    path = mig_path(db)
+    path = mig_path
     cmd = "sequel -m #{path.to_s}"
     cmd += " -M #{version}" if version
     cmd += " #{dburl}" 
@@ -47,18 +104,11 @@ class DbMigCLI < Thor
     #exec cmd
     %x( #{cmd} )
   end
+  map "up" => "migrate"
 
-  desc 'reset DB URL', 'reset db, rollback all migrations'
-  def reset(db = 'try', url = 'try')
-    up(db, url, ver: 0) # FIXME
-  end
-
-  desc 'seed DB URL', 'seed data'
-  def seed(db = 'try', url = 'try')
-    path = db_path(db).join('seed.rb')
-    cmd = "#{path.to_s} #{url}"
-    puts cmd
-    system cmd
+  desc 'reset [URL]', 'reset db, rollback all migrations'
+  def reset(url = 'try')
+    invoke :up, [url], { version: 0 }
   end
 
   desc 'dump [URL]', 'dump db schema'
@@ -69,13 +119,14 @@ class DbMigCLI < Thor
     exec cmd
   end
 
-  desc 'initdb DB', 'init db'
+  desc 'initdb DBNAME', 'init db'
   option :adminurl, default: 'default_admin', banner: 'admin url'
-  def initdb(db)
-    sql = "create database #{db};"
-    ipath = db_path(db).join("init.sql")
+  def initdb(dbname)
+    sql = "create database #{dbname};"
+    ipath = db_path.join("init.sql")
     sql = ipath.read if ipath.exist?
 
+    # todo use sequel internal way???
     url = options[:adminurl]
     dburl = get_dburl(url)
     conn = Dba::ConnectionBuilder.new(url: dburl)
@@ -85,23 +136,26 @@ class DbMigCLI < Thor
     puts result
   end
 
-  desc 'initpath', ''
-  def initpath(db)
-    mig_path(db).mkpath
+  desc 'seed [URL]', 'seed data'
+  def seed(url = 'try')
+    path = db_path.join('seed.rb')
+    cmd = "#{path} #{url}"
+    puts cmd
+    system cmd
   end
 
   no_commands do
-    def mig_path(db)
-      db_path(db).join('migrate')
+    def mig_path
+      db_path.join('migrate')
     end
 
-    def db_path(db)
-      $dbroot.join(db)
+    def db_path
+      Pathname.pwd.join('db')
     end
 
-    def get_dburl(db)
-      return db if Dba::Util.is_url?(db)
-      `dbcli url #{db}`.chomp
+    def get_dburl(url)
+      return url if Dba::Util.is_url?(url)
+      `dbcli url #{url}`.chomp
     end
   end
 end
