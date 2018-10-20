@@ -42,7 +42,7 @@ class DbMigCLI < Thor
         drop database #{dbname}; 
         select datname from pg_catalog.pg_database;
       SQL1
-      dbcli runsql sql123.sql #{adminurl}
+      dbcli runsql sql123.sql #{adminurl} -l
       rm -f sql123.sql
     Desc
     if options[:debug]
