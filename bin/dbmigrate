@@ -54,8 +54,8 @@ class DbMigCLI < Thor
     end
   end
 
-  desc 't1', ''
-  def t1
+  desc 'test1', ''
+  def test1
     system <<~Desc
       cat <<-Abc > f11
         date
@@ -90,9 +90,9 @@ class DbMigCLI < Thor
     exec cmd
   end
 
-  desc 'migrate [URL]', 'run migrations'
+  desc 'migrate URL', 'run migrations'
   option :version, banner: 'run to version, 0 to down all', aliases: [:v]
-  def migrate(url = 'try', ver: nil)
+  def migrate(url, ver: nil)
     dburl = get_dburl(url)
     version = options[:version] || ver
 
@@ -106,13 +106,13 @@ class DbMigCLI < Thor
   end
   map "up" => "migrate"
 
-  desc 'reset [URL]', 'reset db, rollback all migrations'
-  def reset(url = 'try')
-    invoke :up, [url], { version: 0 }
+  desc 'reset URL', 'reset db, rollback all migrations'
+  def reset(url)
+    invoke :migrate, [url], { version: 0 }
   end
 
-  desc 'dump [URL]', 'dump db schema'
-  def dump(url = 'try')
+  desc 'dump URL', 'dump db schema'
+  def dump(url)
     dburl = get_dburl(url)
     cmd = "sequel -D #{dburl}" # use vendor specific
     puts cmd
@@ -136,8 +136,8 @@ class DbMigCLI < Thor
     puts result
   end
 
-  desc 'seed [URL]', 'seed data'
-  def seed(url = 'try')
+  desc 'seed URL', 'seed data'
+  def seed(url)
     path = db_path.join('seed.rb')
     cmd = "#{path} #{url}"
     puts cmd
