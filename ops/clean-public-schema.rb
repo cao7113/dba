@@ -22,7 +22,7 @@ tables.sort.each_with_index do |t, idx|
   puts [idx + 1, t, db.from(t).count].join ' '
 end
 
-## archiv db
+## archive db
 # pga fork starup_production xxx/agentcloud_legacy201808 --dump-opts='--schema public'
 
 ## danage!! clean tables

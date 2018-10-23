@@ -1,6 +1,16 @@
 require 'yaml'
 
-module Dba; end
+module Dba 
+  class << self
+    def lib_path
+      Pathname(__dir__)
+    end
+
+    def dba_root
+      lib_path.parent
+    end
+  end
+end
 
 require_relative 'dba/util'
 require_relative 'dba/script_runner'
