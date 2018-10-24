@@ -1,0 +1,49 @@
+#!/usr/bin/env rundklet
+add_note <<~Note
+  run dba in contaienr with pg client
+Note
+
+base_img = case env
+  when 'pg10'
+    'ruby:2.5-alpine3.7'
+  else # with pg client 9.6
+    'ruby:2.4.4-alpine3.6'
+  end
+
+# https://docs.docker.com/develop/develop-images/dockerfile_best-practices
+write_dockerfile <<~Desc
+  FROM #{base_img}
+  LABEL <%=image_labels%>
+
+  # RUN apk add --no-cache postgresql-client
+  # RUN apk update && apk add build-base postgresql postgresql-dev
+  RUN apk add --no-cache build-base postgresql postgresql-dev
+
+  WORKDIR /app
+  COPY Gemfile ./
+  #ENV GEM_SOURCE=http://docker.for.mac.host.internal:8808
+  #RUN bundle install --without development test --verbose
+  RUN bundle install --verbose
+
+  COPY . /app
+  ENV PATH=/app/bin:$PATH
+Desc
+
+task :main do
+  system_run <<~Desc
+    #{dkrun_cmd(named: true)} -d #{docker_image}
+  Desc
+end
+
+custom_commands do
+  desc 'try', 'try'
+  def try
+    system_run <<~Desc
+      #{dktmprun} echo hi container #{container_name}
+    Desc
+  end
+
+  # todo 
+  # with host network and data volume mounted
+  # run shell in tmp container
+end
