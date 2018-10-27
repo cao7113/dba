@@ -15,10 +15,19 @@ class DbaCLI < Thor
     end
   end
 
-  desc 'url [DB]', 'get db url'
-  def url(db = nil)
-    if db
-      puts get_conn_builder(db)&.url
+  desc 'url [URL] [DB]', 'get db url'
+  def url(url=nil, db = nil)
+    if url
+      conn = get_conn_builder(url)
+      try_url = conn&.url
+      if !try_url || try_url&.empty?
+        abort "Unknow url: #{url}" 
+      end
+      if db
+        puts conn.fork(dbname: db).url
+      else 
+        puts try_url
+      end
     else
       puts $dbs.values.map(&:url)
     end
@@ -62,17 +71,24 @@ class DbaCLI < Thor
   option :line, banner: 'line by line', aliases: [:l]
   def runsql(file = nil, url = nil)
     code = options[:code]
-    if code
+    if code # in inline code mode
       url = file
       file = nil
     else
-      fpath = Pathname(file)
-      code = fpath.read.split("\n").map do |l|
-        next if l =~ /^\s*[#\-]/
-        next if l =~ /^\s*$/
-        l
-      end.compact.join("\n")
+      #if file == 'stdin' # in pipe mode
+      if file == '-' # in pipe mode
+        #code = ARGF.read
+        code = $stdin.read
+      else
+        fpath = Pathname(file)
+        code = fpath.read.split("\n").map do |l|
+          next if l =~ /^\s*[#\-]/
+          next if l =~ /^\s*$/
+          l
+        end.compact.join("\n")
+      end
     end
+
     conn = get_conn_builder(url)
     if options[:line]
       codes = code.split(/;/m)

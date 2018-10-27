@@ -162,6 +162,7 @@ class Dba::ConnectionBuilder
     true
   end
 
+  #like Sequel DB.execute sql_statement
   def run_sql(query, params = nil)
     result = if params
       connection.exec_params(query, params)
@@ -220,7 +221,7 @@ class Dba::ConnectionBuilder
       @conn = conn
       @result = e 
       if failed?
-        puts "==fail: #{e.class} #{e.message}!" 
+        puts "==fail: #{e.class} #{e.message.chomp}!" 
       end
     end
 

@@ -2,6 +2,9 @@
 require_relative '../boot'
 class DbMigCLI < Thor
   class_option :debug, type: :boolean, aliases: [:d]
+  class_option :dry, type: :boolean
+  class_option :quiet, type: :boolean, aliases: [:q]
+  class_option :force, type: :boolean, aliases: [:f]
 
   desc 'init', 'init db project structure'
   def init
@@ -22,10 +25,9 @@ class DbMigCLI < Thor
   desc 'test', 'test all'
   def test(tpath = Pathname(__dir__).join('../tmp/test-dbmigrate'))
     dbname = "dbmig_test#{Time.now.to_i}"
-    dburl = "postgres://localhost/#{dbname}"
     adminurl = "postgres://localhost/postgres"
     puts "working path: #{tpath}"
-    puts "target db: #{dburl} with #{adminurl}"
+    puts "target db: #{dbname} with #{adminurl}"
 
     cmds = <<~Desc
       # setup
@@ -34,38 +36,20 @@ class DbMigCLI < Thor
       # try ops
       dbmigrate init
       dbmigrate generate create_todos
-      dbmigrate initdb #{dbname} --adminurl #{adminurl}
-      dbmigrate migrate #{dburl}
+      dbmigrate createdb #{adminurl} #{dbname}
+      dbmigrate migrate #{adminurl} #{dbname}
       dbmigrate tree
-      # clean
-      cat <<-SQL1 > sql123.sql
-        drop database #{dbname}; 
+      cat <<-SQL | dbcli runsql - #{adminurl} -l
+        drop database if exists #{dbname}; 
         select datname from pg_catalog.pg_database;
-      SQL1
-      dbcli runsql sql123.sql #{adminurl} -l
-      rm -f sql123.sql
+      SQL
     Desc
-    if options[:debug]
+    unless options[:quiet]
       puts 
       puts "# run shell commands"
       puts cmds
-    else
-      system cmds
     end
-  end
-
-  desc 'test1', ''
-  def test1
-    system <<~Desc
-      cat <<-Abc > f11
-        date
-      Abc
-      cat f11
-      ls -l
-      sh f11
-      rm f11
-      ls -l
-    Desc
+    system cmds unless options[:dry]
   end
 
   desc 'generate NAME', 'generate a migration file'
@@ -119,21 +103,35 @@ class DbMigCLI < Thor
     exec cmd
   end
 
-  desc 'initdb DBNAME', 'init db'
-  option :adminurl, default: 'default_admin', banner: 'admin url'
-  def initdb(dbname)
-    sql = "create database #{dbname};"
-    ipath = db_path.join("init.sql")
-    sql = ipath.read if ipath.exist?
-
-    # todo use sequel internal way???
-    url = options[:adminurl]
+  desc 'createdb URL [DBNAME]', 'create db'
+  option :opts, banner: 'create db options'
+  def createdb(url, newdb=nil)
     dburl = get_dburl(url)
+    unless dburl && !dburl.empty?
+      dburl = "postgres://localhost/#{url}"
+    end
+
+    # get new db conn info
     conn = Dba::ConnectionBuilder.new(url: dburl)
-    result = conn.run_sql(sql)
-    puts "==run on #{dburl}:"
-    puts sql
-    puts result
+    if newdb
+      conn = conn.fork(dbname: newdb)
+    end
+    dbname = conn.dbname 
+    if options[:debug]
+      puts "==will create db: #{conn.url} from #{url} #{newdb}" 
+    end
+
+    ## do on postgres or template1 db
+    opsconn = conn.fork(dbname: 'template1')
+    # DROP DATABASE cannot be executed from a function or multi-command string!
+    if options[:force]
+      sql = "drop database if exists #{dbname}" 
+      puts sql unless options[:quiet]
+      opsconn.run_sql sql unless options[:dry]
+    end
+    sql = "create database #{dbname} #{options[:opts]}"
+    puts sql unless options[:quiet]
+    opsconn.run_sql sql unless options[:dry]
   end
 
   desc 'seed URL', 'seed data'
@@ -145,12 +143,12 @@ class DbMigCLI < Thor
   end
 
   no_commands do
-    def mig_path
-      db_path.join('migrate')
-    end
-
     def db_path
       Pathname.pwd.join('db')
+    end
+
+    def mig_path
+      db_path.join('migrate')
     end
 
     def get_dburl(url)
@@ -168,8 +166,8 @@ Sequel.migration do
     # extension :pg_enum
     create_table(:todos) do
       primary_key :id
-      String :name, null: false
-      DateTime :created_at, default: Sequel::CURRENT_TIMESTAMP #, :index=>true
+      String :name, null: false #, :index=>true
+      DateTime :created_at, default: Sequel::CURRENT_TIMESTAMP
       DateTime :updated_at, default: Sequel::CURRENT_TIMESTAMP
     end
   end

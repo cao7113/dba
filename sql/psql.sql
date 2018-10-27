@@ -52,6 +52,12 @@ run shell command in psql session:
 in shell
 psql -d $db_url -XAt -c "select count(*) from public.schema_migrations";
 psql < xxx_sql_file.sql
+cat <<-SQL | psql db1
+  \conninfo
+SQL
+cat <<-SQL | psql -f- db2
+  \conninfo
+SQL
 */
 
 -- echo "select 'drop table data.'||tablename||';' from pg_tables where tablename like 'it_%'" | psql postgres://pass:'dbnopass#fUiP'@abc.com/adb -t | psql postgres://pass:'dbnopass#fUiP'@abc.com/adb
