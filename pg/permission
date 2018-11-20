@@ -1,0 +1,51 @@
+#!/usr/bin/env rundklet
+add_note <<~Note
+  pg permissions todo
+  grant/revoke/role/user
+Note
+
+register_net
+
+task :main do
+  container_run <<~Desc, cid: pg_container
+    pg_isready
+    # --echo-all or -a
+    cat <<-SQL | psql --echo-all
+    SQL
+  Desc
+end
+
+custom_commands do
+  no_commands do
+    def pg_container
+      "dev_pg_default"
+    end
+  end
+end
+
+__END__
+
+
+https://www.postgresql.org/docs/9.6/static/sql-grant.html
+
+
+rolename=xxxx -- privileges granted to a role
+        =xxxx -- privileges granted to PUBLIC
+
+            r -- SELECT ("read")
+            w -- UPDATE ("write")
+            a -- INSERT ("append")
+            d -- DELETE
+            D -- TRUNCATE
+            x -- REFERENCES
+            t -- TRIGGER
+            X -- EXECUTE
+            U -- USAGE
+            C -- CREATE
+            c -- CONNECT
+            T -- TEMPORARY
+      arwdDxt -- ALL PRIVILEGES (for tables, varies for other objects)
+            * -- grant option for preceding privilege
+
+        /yyyy -- role that granted this privilege
+

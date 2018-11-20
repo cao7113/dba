@@ -1,0 +1,43 @@
+#!/usr/bin/env rundklet
+add_note <<~Note
+  pg comment knowledge practice
+  https://stackoverflow.com/questions/33480553/how-to-get-roles-comment-from-the-postgresql-database
+Note
+
+register_net
+
+task :main do
+  container_run <<~Desc, cid: pg_container
+    pg_isready
+    # --echo-all or -a
+    cat <<-SQL | psql --echo-all
+      drop user if exists comment_tester;
+      create user comment_tester with superuser;
+      COMMENT ON ROLE comment_tester IS 'test for comment';
+      \\du+
+      SELECT pg_catalog.shobj_description(r.oid, 'pg_authid') AS description
+        FROM pg_catalog.pg_roles r
+        where r.rolname = 'comment_tester';
+
+      SELECT rolname, description AS comment FROM pg_roles r
+        JOIN pg_shdescription c ON c.objoid = r.oid;
+      drop user if exists comment_tester;
+      -- \h comment
+    SQL
+    # -E enable printing of the internal SQL queries of the psql tool to find out how it retrieves that information
+    psql -E
+  Desc
+end
+
+custom_commands do
+  no_commands do
+    def pg_container
+      "dev_pg_default"
+    end
+  end
+end
+
+__END__
+
+Roles are shared over all databases in a cluster. The comments on those shared objects are contained in the pg_shdescription system catalog. You can get the comment for a role like so:
+
