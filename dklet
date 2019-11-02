@@ -3,11 +3,15 @@ add_note <<~Note
   run dba in contaienr with pg client
 Note
 
+register :appname, 'dba'
+
 base_img = case env
-  when 'pg10'
-    'ruby:2.5-alpine3.7'
-  else # with pg client 9.6
+  when 'pg96' # with pg client 9.6
     'ruby:2.4.4-alpine3.6'
+  when 'pg10' 
+    'ruby:2.5-alpine3.7'
+  else 
+    'ruby:2.5-alpine'
   end
 
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices

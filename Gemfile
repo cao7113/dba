@@ -13,7 +13,7 @@ def gem_fork(name, opts = {})
 end
 
 group :development do
-  gem "byebug"
+  #gem "byebug"
 end
 ## tools
 #gem 'pry'

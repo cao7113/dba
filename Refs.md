@@ -19,10 +19,6 @@ https://www.postgresql.org/docs/9.6/static/postgres-fdw.html
 
 ## Redis
 
-## MySQL
-
-* https://github.com/zhishutech/mysqldba
-
 ## Ref
 
 * datax
